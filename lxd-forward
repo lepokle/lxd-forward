@@ -1,0 +1,87 @@
+#!/usr/bin/bash
+set -e
+
+CALL=""
+DRY_RUN=0
+IPTABLES_FORWARD_RULE="PREROUTING -m addrtype --dst-type LOCAL -j LXD"
+
+function get_ip {
+    HOST="$1"
+    IFNAME="$2"
+    IP=""
+    
+    while [ -z $IP ]; do
+        echo "Probing [$HOST] for ip..." >&2
+        IP=$(lxc info $HOST 2>/dev/null | grep -E $IFNAME':\s+inet\s+' | cut -f 3)
+        sleep 1
+    done
+
+    echo $IP
+}
+
+function setup_rules {
+    FORWARD_RULE="$1"
+    PARTS=(${FORWARD_RULE//:/ })
+    SRC_PORT="${PARTS[0]}"
+    DEST_HOST="${PARTS[1]}"
+    IFNAME="${PARTS[2]}"
+    DEST_PORT="${PARTS[3]}"
+
+    if [ $DRY_RUN ]; then
+        IP="<ip>"
+    else
+        IP=$(get_ip $DEST_HOST $IFNAME)
+    fi
+    echo "Found ip [$IP] for host [$DEST_HOST] on interface [$IFNAME]." >&2
+
+    echo "Set up ($SRC_PORT -> $DEST_HOST:$DEST_PORT)..." >&2
+    $CALL iptables -t nat -A LXD -p tcp -m tcp --dport $SRC_PORT -j DNAT --to-destination $IP:$DEST_PORT
+    echo >&2
+}
+
+if [ "$1" != "on" -a "$1" != "off" -a "$1" != "dry" ]; then
+    echo "Must specify a valid command: on, off, dry."
+    echo -e "\ton:  activate forwarding rules"
+    echo -e "\toff: deactivate forwarding rules"
+    echo -e "\tdry: show what would be done"
+    exit 1
+fi
+
+if [ "$1" == "dry" ]; then
+    echo "Doing DRY run. No changes will be made." >&2
+    echo >&2
+    CALL="echo -e \t"
+    DRY_RUN=1
+fi
+
+echo "Cleanup current rules..." >&2
+$CALL iptables -t nat -D $IPTABLES_FORWARD_RULE 2>/dev/null || /usr/bin/true
+$CALL iptables -t nat -F LXD 2>/dev/null || /usr/bin/true
+$CALL iptables -t nat -X LXD 2>/dev/null || /usr/bin/true
+echo "Cleaned up." >&2
+echo >&2
+
+if [ "$1" == "off" ]; then
+    exit 0;
+fi
+
+CONFIG_FILE="$2"
+if [ -z "$2" ]; then
+    $CONFIG_FILE=/etc/lxd-forward.conf
+fi
+
+echo "Setup chain [LXD] for rules..." >&2
+$CALL iptables -t nat -N LXD
+echo >&2
+
+while read -r line; do
+    [[ "$line" =~ ^\s*$ ]] && continue
+    [[ "$line" =~ ^\s*#.*$ ]] && continue
+
+    echo "Setup forwarding rule...($line)" >&2
+    setup_rules $line
+done < "$CONFIG_FILE"
+
+echo "Activate forwarding rule..." >&2
+$CALL iptables -t nat -A $IPTABLES_FORWARD_RULE
+

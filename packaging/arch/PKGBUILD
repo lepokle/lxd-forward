@@ -1,0 +1,30 @@
+# Maintainer: Scansation GmbH <it-administration@scansation.de>
+pkgname=lxd-forward
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="A simple tool to add iptables rules for forwarding traffic to containers"
+arch=('any')
+url="https://github.com/lepokle/lxd-forward"
+license=('MIT')
+depends=('iptables')
+source=(
+  lxd-forward
+  lxd-forward.conf
+  lxd-forward.service
+)
+md5sums=('4058bbcd03d0f760326dcea340b3ad16'
+         '0931555fc2429974cd1caeac54b1e63b'
+         '1610aa1f8205959307d67ef5c7337c30')
+
+
+package() {
+    mkdir -p "$pkgdir"/etc
+    cp -ar "lxd-forward.conf" "$pkgdir"/etc
+
+    mkdir -p "$pkgdir"/usr/bin/
+    cp -ar "lxd-forward" "$pkgdir"/usr/bin
+
+    mkdir -p "$pkgdir/usr/lib/systemd/system"
+    cp -ar "lxd-forward.service" "$pkgdir/usr/lib/systemd/system"
+}
+

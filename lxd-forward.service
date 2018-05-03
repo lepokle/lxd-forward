@@ -1,0 +1,13 @@
+[Unit]
+Description=Set necessary forwaring rules to route traffic to containers
+After=lxd.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/lxd-forward on
+ExecStop=/usr/bin/lxd-forward off
+
+[Install]
+WantedBy=multi-user.target
+

@@ -1,0 +1,16 @@
+#!/usr/bin/bash
+cd $(readlink -f "`dirname "$0"`")
+
+if [ "$1" = "clean" ]; then
+    [ -d build ] && rm -r build
+    exit 0
+fi
+
+mkdir -p build
+cp PKGBUILD build/PKGBUILD
+cp ../../lxd-forward* build
+
+cd build
+updpksums
+makepkg --syncdeps --noconfirm
+
