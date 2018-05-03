@@ -67,7 +67,7 @@ fi
 
 CONFIG_FILE="$2"
 if [ -z "$2" ]; then
-    $CONFIG_FILE=/etc/lxd-forward.conf
+    CONFIG_FILE=/etc/lxd-forward.conf
 fi
 
 echo "Setup chain [LXD] for rules..." >&2
