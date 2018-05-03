@@ -11,6 +11,6 @@ cp PKGBUILD build/PKGBUILD
 cp ../../lxd-forward* build
 
 cd build
-updpksums
-makepkg --syncdeps --noconfirm
+updpkgsums
+makepkg --syncdeps --noconfirm --force
 

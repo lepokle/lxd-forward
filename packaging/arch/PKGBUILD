@@ -19,12 +19,12 @@ md5sums=('4058bbcd03d0f760326dcea340b3ad16'
 
 package() {
     mkdir -p "$pkgdir"/etc
-    cp -ar "lxd-forward.conf" "$pkgdir"/etc
+    cp "lxd-forward.conf" "$pkgdir"/etc
 
     mkdir -p "$pkgdir"/usr/bin/
-    cp -ar "lxd-forward" "$pkgdir"/usr/bin
+    cp "lxd-forward" "$pkgdir"/usr/bin
 
     mkdir -p "$pkgdir/usr/lib/systemd/system"
-    cp -ar "lxd-forward.service" "$pkgdir/usr/lib/systemd/system"
+    cp "lxd-forward.service" "$pkgdir/usr/lib/systemd/system"
 }
 
