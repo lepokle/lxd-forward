@@ -22,20 +22,33 @@ function get_ip {
 function setup_rules {
     FORWARD_RULE="$1"
     PARTS=(${FORWARD_RULE//:/ })
-    SRC_PORT="${PARTS[0]}"
-    DEST_HOST="${PARTS[1]}"
-    IFNAME="${PARTS[2]}"
-    DEST_PORT="${PARTS[3]}"
+    if [ "${#PARTS[@]}" = 4 ]; then
+        PROTOCOL="tcp"
+        SRC_PORT="${PARTS[0]}"
+        DEST_HOST="${PARTS[1]}"
+        IFNAME="${PARTS[2]}"
+        DEST_PORT="${PARTS[3]}"
+    else
+        PROTOCOL="${PARTS[0]}"
+        SRC_PORT="${PARTS[1]}"
+        DEST_HOST="${PARTS[2]}"
+        IFNAME="${PARTS[3]}"
+        DEST_PORT="${PARTS[4]}"
+    fi
 
-    if [ $DRY_RUN ]; then
+    if [ $DRY_RUN -eq 1 ]; then
         IP="<ip>"
     else
         IP=$(get_ip $DEST_HOST $IFNAME)
     fi
     echo "Found ip [$IP] for host [$DEST_HOST] on interface [$IFNAME]." >&2
 
-    echo "Set up ($SRC_PORT -> $DEST_HOST:$DEST_PORT)..." >&2
-    $CALL iptables -t nat -A LXD -p tcp -m tcp --dport $SRC_PORT -j DNAT --to-destination $IP:$DEST_PORT
+    if [[ $SRC_PORT == *"-"* ]]; then
+        SRC_PORT=$(echo $SRC_PORT | tr - :)
+    fi
+
+    echo "Set up ($PROTOCOL: $SRC_PORT -> $DEST_HOST:$DEST_PORT)..." >&2
+    $CALL iptables --table nat --append LXD --protocol $PROTOCOL --match $PROTOCOL --dport $SRC_PORT --jump DNAT --to-destination $IP:$DEST_PORT
     echo >&2
 }
 
