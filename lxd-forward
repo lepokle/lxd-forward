@@ -3,7 +3,8 @@ set -e
 
 CALL=""
 DRY_RUN=0
-IPTABLES_FORWARD_RULE="PREROUTING -m addrtype --dst-type LOCAL -j LXD"
+IPTABLES_PRE_RULE="PREROUTING --match addrtype --dst-type LOCAL --jump LXD_PRE"
+IPTABLES_POST_RULE="POSTROUTING --jump LXD_POST"
 
 function get_ip {
     HOST="$1"
@@ -19,8 +20,13 @@ function get_ip {
     echo $IP
 }
 
+function get_public_ip {
+    echo $(ip route show default | awk '/default/ {print $3}')
+}
+
 function setup_rules {
     FORWARD_RULE="$1"
+    PUBLIC_IP="$2"
     PARTS=(${FORWARD_RULE//:/ })
     if [ "${#PARTS[@]}" = 4 ]; then
         PROTOCOL="tcp"
@@ -48,7 +54,8 @@ function setup_rules {
     fi
 
     echo "Set up ($PROTOCOL: $SRC_PORT -> $DEST_HOST:$DEST_PORT)..." >&2
-    $CALL iptables --table nat --append LXD --protocol $PROTOCOL --match $PROTOCOL --dport $SRC_PORT --jump DNAT --to-destination $IP:$DEST_PORT
+    $CALL iptables --table nat --append LXD_PRE  --protocol $PROTOCOL --match $PROTOCOL --dport $SRC_PORT --jump DNAT --to-destination $IP:$DEST_PORT
+    $CALL iptables --table nat --append LXD_POST --protocol $PROTOCOL --destination $IP --dport $SRC_PORT --jump SNAT --to-source $PUBLIC_IP
     echo >&2
 }
 
@@ -68,9 +75,12 @@ if [ "$1" == "dry" ]; then
 fi
 
 echo "Cleanup current rules..." >&2
-$CALL iptables -t nat -D $IPTABLES_FORWARD_RULE 2>/dev/null || /usr/bin/true
-$CALL iptables -t nat -F LXD 2>/dev/null || /usr/bin/true
-$CALL iptables -t nat -X LXD 2>/dev/null || /usr/bin/true
+$CALL iptables -t nat -D $IPTABLES_PRE_RULE 2>/dev/null || /usr/bin/true
+$CALL iptables -t nat -D $IPTABLES_POST_RULE 2>/dev/null || /usr/bin/true
+$CALL iptables -t nat -F LXD_PRE 2>/dev/null || /usr/bin/true
+$CALL iptables -t nat -X LXD_PRE 2>/dev/null || /usr/bin/true
+$CALL iptables -t nat -F LXD_POST 2>/dev/null || /usr/bin/true
+$CALL iptables -t nat -X LXD_POST 2>/dev/null || /usr/bin/true
 echo "Cleaned up." >&2
 echo >&2
 
@@ -84,17 +94,19 @@ if [ -z "$2" ]; then
 fi
 
 echo "Setup chain [LXD] for rules..." >&2
-$CALL iptables -t nat -N LXD
+$CALL iptables -t nat -N LXD_PRE
+$CALL iptables -t nat -N LXD_POST
 echo >&2
 
+public_ip=$(get_public_ip)
 while read -r line; do
     [[ "$line" =~ ^\s*$ ]] && continue
     [[ "$line" =~ ^\s*#.*$ ]] && continue
 
     echo "Setup forwarding rule...($line)" >&2
-    setup_rules $line
+    setup_rules $line $public_ip
 done < "$CONFIG_FILE"
 
 echo "Activate forwarding rule..." >&2
-$CALL iptables -t nat -A $IPTABLES_FORWARD_RULE
-
+$CALL iptables -t nat -A $IPTABLES_PRE_RULE
+$CALL iptables -t nat -A $IPTABLES_POST_RULE
