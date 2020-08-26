@@ -1,12 +1,12 @@
 # Maintainer: Scansation GmbH <it-administration@scansation.de>
 pkgname=lxd-forward
-pkgver=1.1.1
+pkgver=1.2.0
 pkgrel=1
 pkgdesc="A simple tool to add iptables rules for forwarding traffic to containers"
 arch=('any')
 url="https://github.com/lepokle/lxd-forward"
 license=('MIT')
-depends=('iptables')
+depends=('iptables' 'ipset')
 backup=(etc/lxd-forward.conf)
 source=(
   lxd-forward

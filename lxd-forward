@@ -76,11 +76,16 @@ fi
 
 echo "Cleanup current rules..." >&2
 $CALL iptables -t nat -D $IPTABLES_PRE_RULE 2>/dev/null || /usr/bin/true
-$CALL iptables -t nat -D $IPTABLES_POST_RULE 2>/dev/null || /usr/bin/true
+$CALL iptables -t nat -m set --match-set lxd_privateips src -D $IPTABLES_POST_RULE 2>/dev/null || /usr/bin/true
 $CALL iptables -t nat -F LXD_PRE 2>/dev/null || /usr/bin/true
 $CALL iptables -t nat -X LXD_PRE 2>/dev/null || /usr/bin/true
 $CALL iptables -t nat -F LXD_POST 2>/dev/null || /usr/bin/true
 $CALL iptables -t nat -X LXD_POST 2>/dev/null || /usr/bin/true
+
+set +e
+$CALL ipset destroy lxd_privateips -q > /dev/null
+set -e
+
 echo "Cleaned up." >&2
 echo >&2
 
@@ -107,6 +112,13 @@ while read -r line; do
     setup_rules $line $public_ip
 done < "$CONFIG_FILE"
 
+echo "Define IP set to filter private ips..." >&2
+$CALL ipset create lxd_privateips hash:net -exist
+$CALL ipset add lxd_privateips 10.0.0.0/8 nomatch
+$CALL ipset add lxd_privateips 172.16.0.0/12 nomatch
+$CALL ipset add lxd_privateips 192.168.0.0/16 nomatch
+
 echo "Activate forwarding rule..." >&2
 $CALL iptables -t nat -A $IPTABLES_PRE_RULE
-$CALL iptables -t nat -A $IPTABLES_POST_RULE
+$CALL iptables -t nat -m set --match-set lxd_privateips src -A $IPTABLES_POST_RULE
+
